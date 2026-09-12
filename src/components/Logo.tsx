@@ -1,0 +1,2 @@
+import {Droplet} from 'lucide-react';
+export default function Logo({dark=false}:{dark?:boolean}){return <div className="flex items-center gap-2"><div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white shadow-sm"><Droplet size={19} fill="currentColor"/></div><div><div className={`text-base font-extrabold ${dark?'text-white':'text-slate-900'}`}>Petro<span className="text-brand-500">Soft</span></div><div className={`text-[9px] font-medium tracking-wide ${dark?'text-slate-400':'text-slate-400'}`}>PETROL PUMP MANAGEMENT</div></div></div>}
