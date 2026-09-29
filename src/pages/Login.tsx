@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import Logo from "../components/Logo";
-import { useAuthStore } from "../store/useAuthStore";
+import { useAuth } from "../context/AuthContext";
 import { apiPost } from "../services/api";
 
 type Role = "ADMIN" | "MANAGER";
@@ -40,7 +40,7 @@ interface LoginResponse {
 
 export default function Login() {
   const nav = useNavigate();
-  const setRole = useAuthStore((state) => state.setRole);
+  const { setSession } = useAuth();
 
   const [email, setEmail] = useState("admin@petrosoft.com");
   const [password, setPassword] = useState("Admin@123");
@@ -114,7 +114,7 @@ export default function Login() {
         localStorage.removeItem("petrosoft_remember");
       }
 
-      setRole(user.role);
+      setSession(token, user);
 
       nav("/dashboard", {
         replace: true,
