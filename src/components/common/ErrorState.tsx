@@ -1,2 +1,0 @@
-import { AlertCircle, RefreshCw } from "lucide-react";
-export default function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) { return <div className="card flex min-h-40 flex-col items-center justify-center gap-3 p-8 text-center"><AlertCircle size={22} className="text-red-500"/><p className="max-w-lg text-sm text-slate-500">{message}</p>{onRetry && <button className="btn-secondary" onClick={onRetry}><RefreshCw size={15}/> Retry</button>}</div>; }

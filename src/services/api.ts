@@ -65,10 +65,3 @@ export const apiDelete = async <T>(
   const response = await api.delete<T>(url);
   return response.data;
 };
-export const apiPatch = async <T, B = unknown>(
-  url: string,
-  body: B
-): Promise<T> => {
-  const response = await api.patch<T>(url, body);
-  return response.data;
-};

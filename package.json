@@ -16,8 +16,7 @@
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",
     "recharts": "^3.10.1",
-    "zustand": "^5.0.15",
-    "jspdf": "^3.0.3"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

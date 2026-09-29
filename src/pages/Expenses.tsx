@@ -1,9 +1,0 @@
-import { useEffect, useMemo, useState } from "react";
-import GenericPage from "../components/common/GenericPage";
-import SearchToolbar from "../components/common/SearchToolbar";
-import LoadingState from "../components/common/LoadingState";
-import ErrorState from "../components/common/ErrorState";
-import { endpoints, resource } from "../services/resourceService";
-import { dateText, money } from "../utils/format";
-
-export default function Expenses(){const [rows,setRows]=useState<any[]>([]);const [q,setQ]=useState("");const [loading,setLoading]=useState(true);const [error,setError]=useState("");const load=async()=>{try{setLoading(true);setError("");setRows(await resource.list<any>(endpoints.expenses));}catch(e:any){setError(e.response?.data?.message||"Unable to load expenses.");}finally{setLoading(false);}};useEffect(()=>{load();},[]);const filtered=useMemo(()=>rows.filter(r=>`${r.description||r.expenseType?.name||r.expenseType||""}`.toLowerCase().includes(q.toLowerCase())),[rows,q]);return <GenericPage title="Expenses" subtitle="Review station expenses and their posting status." action="Refresh" onAction={load} toolbar={<SearchToolbar value={q} onChange={setQ} placeholder="Search expense description or type..."/>}>{loading?<LoadingState/>:error?<ErrorState message={error} onRetry={load}/>:<div className="table-shell overflow-x-auto"><table className="table-base min-w-[700px]"><thead><tr><th>Description</th><th>Type</th><th>Amount</th><th>Date</th><th>Status</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id}><td className="font-semibold">{r.description||"—"}</td><td>{r.expenseType?.name||r.expenseType||"—"}</td><td className="font-bold">{money(r.amount||r.totalAmount)}</td><td>{dateText(r.createdAt||r.date)}</td><td>{r.status||"ACTIVE"}</td></tr>)}{filtered.length===0&&<tr><td colSpan={5} className="p-8 text-center text-sm text-slate-400">No expense records found.</td></tr>}</tbody></table></div>}</GenericPage>}
