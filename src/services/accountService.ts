@@ -14,7 +14,7 @@ export interface Account {
 
   accountName: string;
   phone: string;
-  logoUrl: string;
+  logoUrl: string; // Base64 image
 
   billingStreet: string;
   billingCity: string;

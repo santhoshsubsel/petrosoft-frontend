@@ -1,1 +1,31 @@
-import GenericPage from './GenericPage';export default function Users(){return <GenericPage title="User Management" subtitle="Manage Admin and Manager access with role-based permissions." action="Invite User"><div className="card p-5"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><div className="rounded-xl border p-4"><p className="text-xs text-slate-400">Administrator</p><p className="mt-1 font-bold">Nallathur Admin</p><span className="badge mt-3 bg-blue-50 text-blue-600">Full Access</span></div><div className="rounded-xl border p-4"><p className="text-xs text-slate-400">Station Manager</p><p className="mt-1 font-bold">Manager</p><span className="badge mt-3 bg-emerald-50 text-emerald-600">Operations</span></div></div></div></GenericPage>}
+
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import GenericPage from "./GenericPage";
+import { getResource } from "../services/resourceService";
+
+interface UserRow { id: string; name: string; email: string; status: string; role?: { name: string } | string }
+
+export default function Users() {
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getResource<UserRow[]>("/users")
+      .then(setUsers)
+      .catch((err) => setError(err?.response?.data?.message || "Unable to load users."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return <GenericPage title="User Management" subtitle="Manage Admin and Manager access with role-based permissions." action="Invite User">
+    <div className="card overflow-hidden">
+      {loading ? <div className="grid min-h-40 place-items-center"><Loader2 className="animate-spin text-brand-600"/></div> : error ? <div className="p-5 text-sm text-red-600">{error}</div> : (
+        <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-sm">
+          <thead className="bg-slate-50 text-xs text-slate-400"><tr><th className="px-5 py-3 text-left">Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
+          <tbody>{users.map((user) => <tr key={user.id} className="border-t border-slate-100"><td className="px-5 py-4 font-bold">{user.name}</td><td>{user.email}</td><td>{typeof user.role === "object" ? user.role?.name : user.role || "-"}</td><td><span className="badge bg-emerald-50 text-emerald-600">{user.status}</span></td></tr>)}{!users.length && <tr><td colSpan={4} className="p-10 text-center text-slate-400">No users found.</td></tr>}</tbody>
+        </table></div>
+      )}
+    </div>
+  </GenericPage>;
+}
