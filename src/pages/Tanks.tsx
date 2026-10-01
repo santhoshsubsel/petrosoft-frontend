@@ -104,12 +104,14 @@ function formatNumber(value: number | string | null | undefined) {
     maximumFractionDigits: 2,
   });
 }
-
 function formatDateTime(value: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "-";
+    return {
+      date: "-",
+      time: "-",
+    };
   }
 
   return {

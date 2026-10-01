@@ -408,17 +408,23 @@ const handleDownloadCashClosurePdf = async (sale: DailySale) => {
       }
     }
 
-    const contentType =
-      response.headers?.["content-type"] || "application/pdf";
+   const contentType = String(
+  response.headers?.["content-type"] || "application/pdf"
+);
 
-    // If backend returned JSON error as blob
-    if (contentType.includes("application/json")) {
-      const text = await response.data.text();
-      const json = JSON.parse(text);
-      throw new Error(json?.message || "Failed to generate PDF");
-    }
+// If backend returned JSON error as blob
+if (contentType.includes("application/json")) {
+  const text = await response.data.text();
+  const json = JSON.parse(text);
 
-    const blob = new Blob([response.data], { type: contentType });
+  throw new Error(
+    json?.message || "Failed to generate PDF"
+  );
+}
+
+const blob = new Blob([response.data], {
+  type: contentType,
+});
 
     let fileName = `cash-closure-${formatDate(sale.businessDate)}.pdf`;
 
