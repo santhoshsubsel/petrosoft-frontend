@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Eye, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, History, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import GenericPage from "./GenericPage";
 import { api } from "../services/api";
@@ -59,7 +59,18 @@ interface CashReceiptRow extends PaymentHistoryItem {
   dailySalesId?: string;
 }
 
-type CustomerAction = "OPTIONS" | "PAYMENT" | "RECEIPT" | null;
+type CustomerAction = "OPTIONS" | "PAYMENT" | "RECEIPT" | "TIMELINE" | null;
+
+interface CreditTimelineItem {
+  id: string;
+  type: "CREDIT" | "PAYMENT";
+  date?: string;
+  amount: number;
+  previousBalance: number;
+  newBalance: number;
+  reference?: string | null;
+  paymentMethod?: string | null;
+}
 
 /** Possible mount paths. The first one that responds is used. */
 const CREDIT_ENDPOINTS = ["/credit", "/credits", "/credit-sales"];
@@ -233,6 +244,11 @@ export default function Customers() {
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [paymentHistoryError, setPaymentHistoryError] = useState("");
+
+  /* ------------------------ credit timeline state ---------------------- */
+  const [creditTimeline, setCreditTimeline] = useState<CreditTimelineItem[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState("");
 
   /* ---------------------------- load data ---------------------------- */
 
@@ -570,6 +586,112 @@ export default function Customers() {
     await loadPaymentHistory(selectedCustomer);
   };
 
+  /** Build the customer's complete credit/payment running-balance timeline. */
+  const openCreditTimeline = async () => {
+    if (!selectedCustomer) return;
+
+    setTimelineLoading(true);
+    setTimelineError("");
+    setCreditTimeline([]);
+    setCustomerAction("TIMELINE");
+
+    try {
+      // Use the already loaded credit/receipt data when available.
+      // If either list was unavailable, refresh it before building the timeline.
+      let creditRows = credits;
+      let receiptRows = receipts;
+
+      if (!creditsLoaded) {
+        const result = await fetchList<CreditSaleRow>(CREDIT_ENDPOINTS);
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        creditRows = result.rows;
+      }
+
+      if (!receiptsLoaded) {
+        const result = await fetchList<CashReceiptRow>(RECEIPT_ENDPOINTS);
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        receiptRows = result.rows;
+      }
+
+      const transactions: Array<{
+        id: string;
+        type: "CREDIT" | "PAYMENT";
+        date?: string;
+        amount: number;
+        reference?: string | null;
+        paymentMethod?: string | null;
+      }> = [];
+
+      creditRows
+        .filter(
+          (credit) =>
+            credit.customerId === selectedCustomer.id &&
+            credit.status !== "CANCELLED"
+        )
+        .forEach((credit) => {
+          transactions.push({
+            id: `credit-${credit.id}`,
+            type: "CREDIT",
+            date: credit.saleDate,
+            amount: num(credit.totalAmount),
+            reference: credit.id,
+          });
+        });
+
+      receiptRows
+        .filter((receipt) => receipt.customerId === selectedCustomer.id)
+        .forEach((receipt) => {
+          transactions.push({
+            id: `payment-${receipt.id}`,
+            type: "PAYMENT",
+            date: receipt.receivedAt ?? receipt.createdAt,
+            amount: num(receipt.amount),
+            reference: receipt.receiptNumber ?? receipt.id,
+            paymentMethod: receipt.paymentMethod ?? null,
+          });
+        });
+
+      transactions.sort((a, b) => {
+        const dateA = new Date(a.date ?? 0).getTime();
+        const dateB = new Date(b.date ?? 0).getTime();
+
+        if (dateA !== dateB) return dateA - dateB;
+
+        // Keep credits before payments when they have the same timestamp.
+        if (a.type !== b.type) return a.type === "CREDIT" ? -1 : 1;
+        return a.id.localeCompare(b.id);
+      });
+
+      let runningBalance = 0;
+
+      const timeline = transactions.map((transaction) => {
+        const previousBalance = round2(runningBalance);
+
+        runningBalance =
+          transaction.type === "CREDIT"
+            ? round2(runningBalance + transaction.amount)
+            : round2(runningBalance - transaction.amount);
+
+        return {
+          ...transaction,
+          previousBalance,
+          newBalance: runningBalance,
+        };
+      });
+
+      setCreditTimeline(timeline);
+    } catch (err: unknown) {
+      console.error("Credit timeline loading error:", err);
+      setTimelineError(errMsg(err, "Unable to load customer credit timeline."));
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
   const handlePrintPayment = (payment: PaymentHistoryItem) => {
     if (!selectedCustomer) return;
 
@@ -630,7 +752,7 @@ export default function Customers() {
       onAction={openCreateModal}
       showDefaultFilters={false}
     >
-      <div className="space-y-4">
+      <div className="space-y-4 ">
         {/* SEARCH */}
         <div className="card p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -967,6 +1089,18 @@ export default function Customers() {
                 </div>
                 <Eye size={18} className="text-brand-600" />
               </button>
+
+              <button
+                type="button"
+                onClick={() => void openCreditTimeline()}
+                className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 text-left transition hover:border-brand-500 hover:bg-blue-50"
+              >
+                <div>
+                  <p className="font-bold text-slate-800">Customer Credit Timeline</p>
+                  <p className="mt-1 text-xs text-slate-400">View credit and payment balance history</p>
+                </div>
+                <History size={18} className="text-brand-600" />
+              </button>
             </div>
           </div>
         </ModalFrame>
@@ -1142,6 +1276,122 @@ export default function Customers() {
                           >
                             Print
                           </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+            <button type="button" onClick={closeCustomerAction} className="btn-secondary text-xs">
+              Close
+            </button>
+          </div>
+        </ModalFrame>
+      )}
+
+      {/* CUSTOMER CREDIT TIMELINE MODAL */}
+      {customerAction === "TIMELINE" && selectedCustomer && (
+        <ModalFrame
+          title="Customer Credit Timeline"
+          subtitle={`Credit and payment history - ${selectedCustomer.name}`}
+          onClose={closeCustomerAction}
+          maxWidth="max-w-5xl"
+        >
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="mb-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-400">Credit Limit</p>
+                <p className="mt-1 font-semibold tabular-nums text-slate-700">
+                  ₹{formatAmount(selectedCustomer.creditLimit)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-blue-50 p-4">
+                <p className="text-xs text-brand-600">Total Credit</p>
+                <p className="mt-1 font-semibold tabular-nums text-brand-700">
+                  ₹{formatAmount(selectedCustomer.totalCreditAmount)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-amber-50 p-4">
+                <p className="text-xs text-amber-600">Current Outstanding</p>
+                <p className="mt-1 font-extrabold tabular-nums text-amber-700">
+                  ₹{formatAmount(selectedCustomer.creditOutstanding)}
+                </p>
+              </div>
+            </div>
+
+            {timelineError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                {timelineError}
+              </div>
+            )}
+
+            {timelineLoading ? (
+              <div className="grid min-h-48 place-items-center">
+                <Loader2 size={24} className="animate-spin text-brand-600" />
+              </div>
+            ) : creditTimeline.length === 0 ? (
+              <div className="py-16 text-center text-sm text-slate-400">
+                No credit or payment history found.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[850px] text-sm">
+                  <thead className="border-b border-slate-200">
+                    <tr>
+                      <th className={`${th} text-left`}>Date</th>
+                      <th className={`${th} text-left`}>Transaction</th>
+                      <th className={`${th} text-left`}>Reference</th>
+                      <th className={`${th} text-right`}>Amount</th>
+                      <th className={`${th} text-right`}>Previous Balance</th>
+                      <th className={`${th} text-right`}>New Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...creditTimeline].reverse().map((item) => (
+                      <tr
+                        key={item.id}
+                        className="border-b border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="px-4 py-4 text-slate-600">
+                          {formatDate(item.date)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-bold ${
+                              item.type === "CREDIT"
+                                ? "bg-red-50 text-red-600"
+                                : "bg-emerald-50 text-emerald-600"
+                            }`}
+                          >
+                            {item.type === "CREDIT" ? "CREDIT ADDED" : "PAYMENT RECEIVED"}
+                          </span>
+                          {item.type === "PAYMENT" && item.paymentMethod && (
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              {item.paymentMethod}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-slate-600">
+                          {item.reference || "-"}
+                        </td>
+                        <td
+                          className={`px-4 py-4 text-right font-bold tabular-nums ${
+                            item.type === "CREDIT"
+                              ? "text-red-600"
+                              : "text-emerald-600"
+                          }`}
+                        >
+                          {item.type === "CREDIT" ? "+" : "-"}₹{formatAmount(item.amount)}
+                        </td>
+                        <td className="px-4 py-4 text-right tabular-nums text-slate-600">
+                          ₹{formatAmount(item.previousBalance)}
+                        </td>
+                        <td className="px-4 py-4 text-right font-extrabold tabular-nums text-slate-800">
+                          ₹{formatAmount(item.newBalance)}
                         </td>
                       </tr>
                     ))}

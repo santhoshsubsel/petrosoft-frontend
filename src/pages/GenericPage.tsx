@@ -31,7 +31,7 @@ export default function GenericPage({
   showDefaultFilters = true,
 }: GenericPageProps) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-10">
       {/* Header */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>

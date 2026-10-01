@@ -112,8 +112,8 @@ export default function Sidebar() {
         </nav>
 
         <div className="mt-4 shrink-0 border-t border-white/10 pt-4">
-          <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Business Unit</div>
-          <div className="mt-1 px-2 text-xs font-semibold">Subsel</div>
+          {/* <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Business Unit</div>
+          <div className="mt-1 px-2 text-xs font-semibold">Subsel</div> */}
           <div className="mt-1 px-2 text-[10px] text-slate-500">PetroSoft v1.0.0</div>
         </div>
       </aside>

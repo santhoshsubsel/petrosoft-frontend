@@ -236,7 +236,7 @@ export default function LubricantSales() {
   }
 
   return (
-    <div className="relative space-y-5 pb-24">
+    <div className="relative space-y-5 pb-24 pt-10">
       {/* Header */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">

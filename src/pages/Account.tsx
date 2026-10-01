@@ -12,6 +12,7 @@ import {
   Droplet,
   Camera,
   ReceiptText,
+  Truck,
 } from "lucide-react";
 
 import {
@@ -54,7 +55,7 @@ import {
   type OilProductUnit,
 } from "../services/oilProductService";
 
-type MainTab = "account" | "petrol" | "oil" | "expense-types";
+type MainTab = "account" | "petrol" | "oil" | "expense-types" | "vehicles";
 type PetrolSection = "products" | "tanks" | "nozzle";
 
 type TankView = {
@@ -204,7 +205,7 @@ export default function Account() {
   }, []);
 
   return (
-    <div>
+    <div className="space-y-5 pt-10">
       {/* Plain header: no Add New / Search / Filter / Export */}
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Account Setup</h1>
@@ -218,6 +219,7 @@ export default function Account() {
         <MainTabButton label="Petrol" active={activeTab === "petrol"} onClick={() => setActiveTab("petrol")} />
         <MainTabButton label="Oil" active={activeTab === "oil"} onClick={() => setActiveTab("oil")} />
         <MainTabButton label="Expense Types" active={activeTab === "expense-types"} onClick={() => setActiveTab("expense-types")} />
+        <MainTabButton label="Vehicles" active={activeTab === "vehicles"} onClick={() => setActiveTab("vehicles")} />
       </div>
 
       {/* Account loading/error only blocks this tab; Petrol and Oil load independently */}
@@ -237,6 +239,7 @@ export default function Account() {
       {activeTab === "petrol" && <PetrolTab />}
       {activeTab === "oil" && <OilTab />}
       {activeTab === "expense-types" && <ExpenseTypesTab />}
+      {activeTab === "vehicles" && <VehiclesTab />}
     </div>
   );
 }
@@ -997,6 +1000,176 @@ function ExpenseTypeModal({ title, expenseType, onClose, onSave }: { title: stri
   return <Modal title={title} onClose={onClose}>
     {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>}
     <Field label="Expense Type Name" required value={name} onChange={setName} />
+    <ModalFooter saving={saving} onCancel={onClose} onSave={submit} />
+  </Modal>;
+}
+
+/* =========================================================
+   VEHICLES
+   Backend: /vehicles  (GET list, POST create, PATCH/PUT :id)
+========================================================= */
+
+type Vehicle = {
+  id: string;
+  vehicleNumber: string;
+  vehicleType?: string | null;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type VehiclePayload = {
+  vehicleNumber: string;
+  vehicleType?: string;
+};
+
+const VEHICLES_ENDPOINT = "/vehicles";
+
+const apiErrorMessage = (err: unknown, fallback: string) => {
+  const message = (err as { response?: { data?: { message?: unknown } } } | null)?.response?.data
+    ?.message;
+  return typeof message === "string" && message ? message : fallback;
+};
+
+function VehiclesTab() {
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+
+  const loadVehicles = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const data = await getResource<Vehicle[]>(VEHICLES_ENDPOINT);
+      setVehicles(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Vehicles GET error:", err);
+      setError(apiErrorMessage(err, "Unable to load vehicles."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadVehicles();
+  }, []);
+
+  const filteredVehicles = useMemo(() => {
+    const value = search.trim().toLowerCase();
+    return vehicles.filter(
+      (item) =>
+        item.active !== false &&
+        (!value ||
+          item.vehicleNumber.toLowerCase().includes(value) ||
+          (item.vehicleType ?? "").toLowerCase().includes(value)),
+    );
+  }, [vehicles, search]);
+
+  const saveVehicle = async (payload: VehiclePayload) => {
+    setError("");
+    if (editingVehicle) {
+      const saved = await updateResource<Vehicle, VehiclePayload>(
+        `${VEHICLES_ENDPOINT}/${editingVehicle.id}`,
+        payload,
+      );
+      setVehicles((prev) => prev.map((item) => (item.id === editingVehicle.id ? saved : item)));
+    } else {
+      const saved = await createResource<Vehicle, VehiclePayload>(VEHICLES_ENDPOINT, payload);
+      setVehicles((prev) => [saved, ...prev]);
+    }
+    setModalOpen(false);
+    setEditingVehicle(null);
+  };
+
+  const deactivateVehicle = async (id: string) => {
+    try {
+      setError("");
+      const saved = await updateResource<Vehicle, { active: boolean }>(
+        `${VEHICLES_ENDPOINT}/${id}`,
+        { active: false },
+      );
+      setVehicles((prev) => prev.map((item) => (item.id === id ? saved : item)));
+    } catch (err) {
+      console.error("Vehicle deactivate error:", err);
+      setError(apiErrorMessage(err, "Unable to deactivate vehicle."));
+    }
+  };
+
+  return (
+    <div className="mt-4 grid grid-cols-1 rounded-xl border border-slate-200 bg-white shadow-sm md:grid-cols-[200px_1fr]">
+      <div className="border-b border-slate-200 p-4 md:border-b-0 md:border-r md:p-6">
+        <h3 className="mb-4 hidden text-base font-bold text-slate-900 md:block">Data Setup</h3>
+        <div className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+          <SideItem icon={Truck} label="Vehicles" active onClick={() => undefined} />
+        </div>
+      </div>
+
+      <div className="min-w-0 p-4 md:p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-sm flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search vehicles..." className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" />
+          </div>
+          <button type="button" onClick={() => { setEditingVehicle(null); setModalOpen(true); }} className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90"><Plus size={16} />Add New</button>
+        </div>
+
+        {error && <div className="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+
+        {loading ? (
+          <TableWrapper><div className="p-8 text-center text-sm text-slate-500">Loading vehicles...</div></TableWrapper>
+        ) : (
+          <TableWrapper>
+            <table className="w-full border-collapse">
+              <thead><tr className="text-left text-sm font-bold text-slate-900"><th className="sticky top-0 z-10 bg-[#d9ad50] px-3 py-3">Vehicle Number</th><th className="sticky top-0 z-10 bg-[#d9ad50] px-3 py-3">Vehicle Type</th><th className="sticky top-0 z-10 bg-[#d9ad50] px-3 py-3">Status</th><th className="sticky top-0 z-10 w-32 bg-[#d9ad50] px-3 py-3 text-right">Action</th></tr></thead>
+              <tbody>
+                {filteredVehicles.map((item) => <tr key={item.id} className="border-t border-slate-200 odd:bg-white even:bg-slate-50 transition-colors hover:bg-amber-50/60">
+                  <td className="px-3 py-3 text-sm font-bold text-slate-800">{item.vehicleNumber}</td>
+                  <td className="px-3 py-3 text-sm">{item.vehicleType || "-"}</td>
+                  <td className="px-3 py-3 text-sm"><span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span></td>
+                  <td className="px-3 py-3"><ActionButtons onEdit={() => { setEditingVehicle(item); setModalOpen(true); }} onDelete={() => void deactivateVehicle(item.id)} /></td>
+                </tr>)}
+                {filteredVehicles.length === 0 && <EmptyRow colSpan={4} />}
+              </tbody>
+            </table>
+          </TableWrapper>
+        )}
+      </div>
+
+      {modalOpen && <VehicleModal title={editingVehicle ? "Edit Vehicle" : "Add New Vehicle"} vehicle={editingVehicle} onClose={() => { setModalOpen(false); setEditingVehicle(null); }} onSave={saveVehicle} />}
+    </div>
+  );
+}
+
+function VehicleModal({ title, vehicle, onClose, onSave }: { title: string; vehicle: Vehicle | null; onClose: () => void; onSave: (payload: VehiclePayload) => Promise<void> }) {
+  const [vehicleNumber, setVehicleNumber] = useState(vehicle?.vehicleNumber ?? "");
+  const [vehicleType, setVehicleType] = useState(vehicle?.vehicleType ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    const number = vehicleNumber.trim().toUpperCase();
+    if (!number) { setError("Vehicle number is required."); return; }
+    try {
+      setSaving(true);
+      setError("");
+      await onSave({ vehicleNumber: number, vehicleType: vehicleType.trim() || undefined });
+    } catch (err) {
+      console.error("Vehicle save error:", err);
+      setError(apiErrorMessage(err, "Unable to save vehicle."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return <Modal title={title} onClose={onClose}>
+    {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+    <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+      <Field label="Vehicle Number" required value={vehicleNumber} onChange={setVehicleNumber} />
+      <Field label="Vehicle Type" value={vehicleType} onChange={setVehicleType} />
+    </div>
     <ModalFooter saving={saving} onCancel={onClose} onSave={submit} />
   </Modal>;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Download,
   IndianRupee,
@@ -135,7 +136,20 @@ export default function Dashboard() {
 
   const [report, setReport] = useState<SalesReport | null>(null);
   const [salesLoading, setSalesLoading] = useState(true);
+const [searchParams] = useSearchParams();
 
+const getLocalDate = () => {
+  const now = new Date();
+
+  return `${now.getFullYear()}-${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+};
+
+const selectedDate =
+  searchParams.get("date") || getLocalDate();
   /* -------------------------------------------------------
      PRODUCTS
   ------------------------------------------------------- */
@@ -156,24 +170,39 @@ export default function Dashboard() {
      LOAD SALES
   ======================================================= */
 
-  useEffect(() => {
-    const loadSales = async () => {
-      try {
-        setSalesLoading(true);
+useEffect(() => {
+  const loadSales = async () => {
+    try {
+      setSalesLoading(true);
 
-        const sales = await getResource<SalesReport>("/reports/sales");
+      const sales =
+        await getResource<SalesReport>(
+          `/reports/sales?date=${selectedDate}`
+        );
 
-        setReport(sales);
-      } catch (error) {
-        console.error("Sales dashboard loading failed:", error);
-      } finally {
-        setSalesLoading(false);
-      }
-    };
+      setReport(sales);
+    } catch (error) {
+      console.error(
+        "Sales dashboard loading failed:",
+        error
+      );
 
-    loadSales();
-  }, []);
+      setReport({
+        totals: {
+          dailySales: 0,
+          expenses: 0,
+          creditSales: 0,
+          oilSales: 0,
+        },
+        dailySales: [],
+      });
+    } finally {
+      setSalesLoading(false);
+    }
+  };
 
+  void loadSales();
+}, [selectedDate]);
   /* =======================================================
      LOAD PRODUCTS
   ======================================================= */
@@ -344,7 +373,32 @@ export default function Dashboard() {
   ======================================================= */
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-10">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+  <div>
+    <h1 className="text-xl font-extrabold text-slate-900">
+      Dashboard
+    </h1>
+
+    <p className="text-xs text-slate-400">
+      Revenue and station performance overview
+    </p>
+  </div>
+
+  <div className="inline-flex w-fit items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+    <span className="h-2 w-2 rounded-full bg-blue-600" />
+
+    Revenue for{" "}
+    {new Date(`${selectedDate}T00:00:00`).toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    )}
+  </div>
+</div>
       {/* ===================================================
           SALES STAT CARDS
       =================================================== */}

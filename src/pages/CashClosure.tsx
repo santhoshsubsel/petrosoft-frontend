@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Calculator,
@@ -85,6 +85,8 @@ interface Preview {
   totalSales?: Num;
   expenses?: Num;
   cashReceipts?: Num;
+  /** Server-calculated: Petroleum + Oil - Credit - Expenses */
+  cashSales?: Num;
   expectedCash?: Num;
   actualCashEntered?: Num;
   difference?: Num;
@@ -480,6 +482,13 @@ export default function CashClosure() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [formError, setFormError] = useState("");
+  const [invalid, setInvalid] = useState<{ actual: boolean; comments: boolean }>({
+    actual: false,
+    comments: false,
+  });
+  const formErrorRef = useRef<HTMLDivElement | null>(null);
+  const topErrorRef = useRef<HTMLDivElement | null>(null);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState<Closure | null>(null);
@@ -516,6 +525,20 @@ export default function CashClosure() {
   );
 
   const isClosed = activeClosure?.status === "CLOSED";
+
+  /* Bring validation / API errors into view (the form is long, so the banner
+     at the top of the page is usually scrolled out of sight). */
+  useEffect(() => {
+    if (formError) {
+      formErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [formError]);
+
+  useEffect(() => {
+    if (error) {
+      topErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [error]);
 
   /* ---------------------------- LOAD ---------------------------- */
 
@@ -598,6 +621,8 @@ export default function CashClosure() {
       const response = await api.get(`/cash-closure/preview/${activeDay.id}`, {
         params: {
           startingCashBalance: Number(starting || 0),
+          paytmAmount: Number(paytm || 0),
+          ccmsHpPayAmount: Number(ccms || 0),
           supplierBankAmount: Number(supplier || 0),
           otherPayments: Number(other || 0),
         },
@@ -624,6 +649,8 @@ export default function CashClosure() {
       const response = await api.get(`/cash-closure/preview/${row.dailySalesId}`, {
         params: {
           startingCashBalance: Number(row.startingCashBalance ?? 0),
+          paytmAmount: Number(row.paytmAmount ?? 0),
+          ccmsHpPayAmount: Number(row.ccmsHpPayAmount ?? 0),
           supplierBankAmount: Number(row.supplierBankAmount ?? 0),
           otherPayments: Number(row.otherPayments ?? 0),
         },
@@ -661,6 +688,8 @@ export default function CashClosure() {
 
   function resetForm() {
     setError("");
+    setFormError("");
+    setInvalid({ actual: false, comments: false });
     if (activeClosure) {
       fillFromClosure(activeClosure);
     } else {
@@ -871,23 +900,33 @@ export default function CashClosure() {
   const serverExpected = isClosed ? activeClosure?.expectedCash : preview?.expectedCash;
   const isEstimated = serverExpected === null || serverExpected === undefined;
 
+  /*
+   * Total Cash Sale = Petroleum + Oil - Credit - Expenses
+   * (same formula as the server and the printed Day Cash Closing Report).
+   * Prefer the server-calculated value; fall back to a local calculation.
+   */
+  const baseCashSales =
+    preview?.cashSales != null
+      ? n(preview.cashSales)
+      : n(preview?.totalSales) + oilTotal - creditTotal - n(preview?.expenses);
+
   const estimatedExpected =
     n(starting) +
-    n(preview?.totalSales) +
-    n(preview?.cashReceipts) -
-    n(preview?.expenses) -
-    creditTotal -
+    baseCashSales +
+    n(preview?.cashReceipts ?? preview?.creditReceived) -
     n(paytm) -
     n(ccms) -
     n(supplier) -
     n(other);
 
   const expected = round2(isEstimated ? estimatedExpected : Number(serverExpected));
-  const difference = actual === "" ? 0 : round2(Number(actual) - expected);
+  const difference: number | null = actual === "" ? null : round2(Number(actual) - expected);
   const expectedTotal = petroleumTotal + oilTotal;
 
   const diffTone =
-    difference === 0
+    difference === null
+      ? "bg-slate-50 text-slate-500"
+      : difference === 0
       ? "bg-emerald-50 text-emerald-700"
       : difference < 0
         ? "bg-red-50 text-red-700"
@@ -902,7 +941,7 @@ export default function CashClosure() {
     paytmAmount: Number(paytm || 0),
     ccmsHpPayAmount: Number(ccms || 0),
     actualCashEntered: Number(actual || 0),
-    comments: comments.trim(),
+    comments: comments.trim() || null,
   });
 
   async function ensureClosure(): Promise<Closure> {
@@ -925,23 +964,26 @@ export default function CashClosure() {
       return false;
     }
 
-    if (actual === "" || Number(actual) < 0) {
-      setError("Enter Total Available Cash before submitting.");
+    const actualInvalid = actual === "" || Number.isNaN(Number(actual)) || Number(actual) < 0;
+
+    if (actualInvalid) {
+      setInvalid({ actual: true, comments: false });
+      setFormError(
+        "Enter Total Available Cash (the cash you counted in the drawer) before submitting.",
+      );
       return false;
     }
 
-    if (!comments.trim()) {
-      setError("Comments are required.");
-      return false;
-    }
-
+    setInvalid({ actual: false, comments: false });
+    setFormError("");
     setError("");
     return true;
   }
 
   async function openReport(mode: Exclude<ReportMode, null>) {
     if (mode === "confirm" && !validate()) return;
-    await calculate();
+    const data = await calculate();
+    if (!data) return; // error banner is shown by calculate()
     setReport(mode);
   }
 
@@ -1179,7 +1221,7 @@ export default function CashClosure() {
   ];
 
   return (
-    <div className="space-y-5 pb-8">
+    <div className="space-y-5 pb-8 pt-10">
       {/* HEADER */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -1201,6 +1243,7 @@ export default function CashClosure() {
 
       {error && (
         <div
+          ref={topErrorRef}
           role="alert"
           className="flex items-start justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600"
         >
@@ -1433,33 +1476,59 @@ export default function CashClosure() {
 
                 <Field label="Total Available Cash" required hint="Actual cash counted in the drawer">
                   <input
-                    className="input text-base font-bold"
+                    className={`input text-base font-bold ${
+                      invalid.actual ? "border-red-400 ring-2 ring-red-200" : ""
+                    }`}
                     type="number"
                     min="0"
                     step="0.01"
                     disabled={isClosed}
                     value={actual}
-                    onChange={(e) => setActual(e.target.value)}
+                    onChange={(e) => {
+                      setActual(e.target.value);
+                      if (invalid.actual) setInvalid((s) => ({ ...s, actual: false }));
+                    }}
                   />
                 </Field>
 
                 <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${diffTone}`}>
                   <span className="text-xs font-bold">Difference</span>
-                  <span className="text-lg font-extrabold tabular-nums">{money(difference)}</span>
+                  <span className="text-lg font-extrabold tabular-nums">{difference === null ? "—" : money(difference)}</span>
                 </div>
               </div>
 
               <div className="mt-4">
-                <Field label="Comments" required>
+                <Field label="Comments (optional)">
                   <textarea
-                    className="input min-h-24"
+                    className={`input min-h-24 ${
+                      invalid.comments ? "border-red-400 ring-2 ring-red-200" : ""
+                    }`}
                     disabled={isClosed}
                     value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    placeholder="Add closing remarks for this business day"
+                    onChange={(e) => {
+                      setComments(e.target.value);
+                      if (invalid.comments) setInvalid((s) => ({ ...s, comments: false }));
+                    }}
+                    placeholder="Add closing remarks for this business day (optional)"
                   />
                 </Field>
               </div>
+
+              {formError && (
+                <div
+                  ref={formErrorRef}
+                  role="alert"
+                  className="mt-4 flex items-start justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600"
+                >
+                  <span className="inline-flex items-start gap-2">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                    {formError}
+                  </span>
+                  <button type="button" aria-label="Dismiss" onClick={() => setFormError("")}>
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
 
               <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
@@ -1474,7 +1543,7 @@ export default function CashClosure() {
                 <button
                   type="button"
                   className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                  disabled={saving || calculating}
+                  disabled={saving}
                   onClick={() => void openReport("preview")}
                 >
                   {calculating ? (
@@ -1488,7 +1557,7 @@ export default function CashClosure() {
                 <button
                   type="button"
                   className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                  disabled={saving || calculating || isClosed}
+                  disabled={saving || isClosed}
                   onClick={() => void openReport("confirm")}
                 >
                   <LockKeyhole size={15} />
@@ -1555,7 +1624,7 @@ export default function CashClosure() {
             </div>
             <div className={`rounded-2xl p-4 ${diffTone}`}>
               <p className="text-xs">Difference</p>
-              <p className="mt-1 text-lg font-extrabold tabular-nums">{money(difference)}</p>
+              <p className="mt-1 text-lg font-extrabold tabular-nums">{difference === null ? "—" : money(difference)}</p>
             </div>
           </div>
 
