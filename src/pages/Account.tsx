@@ -367,9 +367,9 @@ function AccountDetails({
           </dl>
         </DetailCard>
 
-        <DetailCard title="Notification Settings" onEdit={() => setModal("settings")}>
+        {/* <DetailCard title="Notification Settings" onEdit={() => setModal("settings")}>
           <NotificationFields settings={account.settings} />
-        </DetailCard>
+        </DetailCard> */}
       </div>
 
       {modal === "business" && (
@@ -449,7 +449,7 @@ function NotificationFields({
 
   return (
     <div className="space-y-4">
-      <Toggle
+      {/* <Toggle
         label="Enable Customer Email for Credit Payment"
         checked={settings.enableCustomerEmailForCreditPayment}
         editable={editable}
@@ -466,7 +466,7 @@ function NotificationFields({
           <Toggle label="Only Admin" checked={settings.onlyAdmin} editable={editable} subtle onChange={change("onlyAdmin")} />
           <Toggle label="Configure Email" checked={settings.configureEmail} editable={editable} subtle onChange={change("configureEmail")} />
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
@@ -503,7 +503,7 @@ function SettingsEditModal({
   return (
     <Modal title="Edit Settings" onClose={onClose}>
       {error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>}
-      <NotificationFields settings={form} onToggle={toggle} />
+      {/* <NotificationFields settings={form} onToggle={toggle} /> */}
       <ModalFooter saving={saving} onCancel={onClose} onSave={save} />
     </Modal>
   );
