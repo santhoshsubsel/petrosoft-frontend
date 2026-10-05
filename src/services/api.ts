@@ -27,11 +27,30 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("petrosoft_token");
-      localStorage.removeItem("petrosoft_user");
+    const status = error.response?.status;
+    const url = String(error.config?.url || "");
+    const method = String(error.config?.method || "").toLowerCase();
 
-      window.location.href = "/login";
+    if (status === 401) {
+      const onLoginPage = window.location.pathname.includes("/login");
+
+      // Do NOT force logout for cash-closure close — let the page show the error
+      const isCashClosureClose =
+        method === "post" &&
+        url.includes("/cash-closure") &&
+        url.includes("/close");
+
+      if (!onLoginPage && !isCashClosureClose) {
+        localStorage.removeItem("petrosoft_token");
+        localStorage.removeItem("petrosoft_user");
+        window.location.href = "/login";
+      } else if (isCashClosureClose) {
+        // Keep user on page; closeDay() catch will handle setError
+        console.warn(
+          "Cash closure close unauthorized:",
+          error.response?.data
+        );
+      }
     }
 
     return Promise.reject(error);
@@ -59,9 +78,15 @@ export const apiPut = async <T, B = unknown>(
   return response.data;
 };
 
-export const apiDelete = async <T>(
-  url: string
-): Promise<T> => {
+export const apiDelete = async <T>(url: string): Promise<T> => {
   const response = await api.delete<T>(url);
+  return response.data;
+};
+
+export const apiPatch = async <T, B = unknown>(
+  url: string,
+  body: B
+): Promise<T> => {
+  const response = await api.patch<T>(url, body);
   return response.data;
 };
