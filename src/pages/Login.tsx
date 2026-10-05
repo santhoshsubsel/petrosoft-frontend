@@ -401,7 +401,7 @@ export default function Login() {
 
         {/* FOOTER */}
         <p className="mt-12 text-center text-[10px] text-slate-400">
-          RAJ AGENCIES, HPCL DEALER · PetroSoft v1.0.0
+         PetroSoft v1.0.0
         </p>
 
       </div>
