@@ -1216,7 +1216,7 @@ function ProductModal({
       <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
         <Field label="Product Name" required value={name} onChange={setName} />
         <Field label="Product SKU" value={code} onChange={setCode} />
-        <SelectField label="Product Type" value={productType} options={["PETROL", "DIESEL", "OIL", "WATER", "OTHER"]} onChange={(value) => setProductType(value as ProductType)} />
+        <SelectField label="Product Type" value={productType} options={["PETROL", "DIESEL", "OIL", "OTHER"]} onChange={(value) => setProductType(value as ProductType)} />
         <SelectField label="Unit" value={unit} options={["LITRE", "PIECE", "BOTTLE"]} onChange={(value) => setUnit(value as ProductUnit)} />
         <Field label="Unit Price" required type="number" value={price} onChange={setPrice} />
         <Field label="Minimum Stock" type="number" value={minStock} onChange={setMinStock} />

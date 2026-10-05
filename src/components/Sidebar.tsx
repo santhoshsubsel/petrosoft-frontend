@@ -31,11 +31,11 @@ const managerItems: NavItem[] = [
 
 const adminItems: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/customers", label: "Customer", icon: UserRound },
   { to: "/daily-sales", label: "Daily Sales", icon: ClipboardList },
-  { to: "/products", label: "Product & Stock", icon: Package },
   { to: "/tanks", label: "Tank Management", icon: Warehouse },
   { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/products", label: "Product & Stock", icon: Package },
+  { to: "/customers", label: "Customer", icon: UserRound },
   { to: "/account", label: "Account Setup", icon: Settings },
 ];
 
