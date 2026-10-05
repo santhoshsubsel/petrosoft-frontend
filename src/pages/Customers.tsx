@@ -692,44 +692,222 @@ export default function Customers() {
     }
   };
 
-  const handlePrintPayment = (payment: PaymentHistoryItem) => {
+   const handlePrintPayment = (payment: PaymentHistoryItem) => {
     if (!selectedCustomer) return;
 
-    const printWindow = window.open("", "_blank", "width=800,height=700");
+    const printWindow = window.open("", "_blank", "width=860,height=900");
     if (!printWindow) return;
 
     const receiptNumber = esc(payment.receiptNumber || payment.id);
     const paymentDate = esc(formatDate(payment.receivedAt || payment.createdAt));
+    const customerName = esc(selectedCustomer.name);
+    const customerPhone = esc(selectedCustomer.phone || "-");
+    const method = esc(payment.paymentMethod || "-");
 
-    const row = (label: string, value: string) =>
-      `<div class="row"><span class="label">${label}</span><span>${value}</span></div>`;
+    const item = (label: string, value: string) =>
+      `<div class="item">
+        <div class="item-label">${label}</div>
+        <div class="item-value">${value}</div>
+      </div>`;
 
     printWindow.document.write(`<!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8" />
     <title>Payment Receipt - ${receiptNumber}</title>
     <style>
-      body { font-family: Arial, sans-serif; padding: 40px; color: #222; }
-      .receipt { max-width: 700px; margin: 0 auto; border: 1px solid #ddd; padding: 30px; }
-      h1 { text-align: center; margin-bottom: 30px; }
-      .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-      .label { font-weight: bold; }
-      .amount { font-size: 24px; font-weight: bold; text-align: right; margin: 25px 0; }
-      .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #777; }
+      @page { size: A4; margin: 14mm; }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background: #f1f5f9;
+        color: #0f172a;
+        padding: 32px 16px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .receipt {
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      }
+
+      /* ---------- Header ---------- */
+      .header {
+        background: #0f172a;
+        color: #ffffff;
+        padding: 28px 32px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 4px solid #f59e0b;
+      }
+      .brand { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+      .brand-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; letter-spacing: 1.5px; text-transform: uppercase; }
+      .header-right { text-align: right; }
+      .doc-title { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #f59e0b; }
+      .doc-number { font-size: 15px; font-weight: 600; margin-top: 6px; }
+
+      /* ---------- Body ---------- */
+      .body { padding: 28px 32px 8px; }
+
+      .status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 22px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #dcfce7;
+        color: #166534;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        padding: 6px 14px;
+        border-radius: 999px;
+      }
+      .badge::before {
+        content: "";
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: #16a34a;
+      }
+      .date { font-size: 13px; color: #64748b; }
+
+      /* ---------- Amount card ---------- */
+      .amount-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 26px;
+      }
+      .amount-label { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: #64748b; }
+      .amount-value { font-size: 36px; font-weight: 800; margin-top: 6px; color: #0f172a; letter-spacing: -0.5px; }
+
+      /* ---------- Details grid ---------- */
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px 24px;
+        padding-bottom: 24px;
+      }
+      .item-label { font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: #94a3b8; }
+      .item-value { font-size: 15px; font-weight: 600; margin-top: 5px; color: #1e293b; word-break: break-word; }
+      .item.full { grid-column: 1 / -1; }
+
+      .comments {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 24px;
+      }
+      .comments .item-label { color: #b45309; }
+      .comments .item-value { font-weight: 500; font-size: 14px; color: #78350f; }
+
+      /* ---------- Signature ---------- */
+      .sign-row {
+        display: flex;
+        justify-content: space-between;
+        margin: 36px 0 28px;
+      }
+      .sign {
+        width: 40%;
+        border-top: 1px dashed #cbd5e1;
+        padding-top: 8px;
+        text-align: center;
+        font-size: 11px;
+        color: #94a3b8;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+
+      /* ---------- Footer ---------- */
+      .footer {
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        text-align: center;
+        padding: 18px 32px;
+        font-size: 12px;
+        color: #64748b;
+      }
+      .footer strong { color: #0f172a; }
+
+      @media print {
+        body { background: #ffffff; padding: 0; }
+        .receipt { box-shadow: none; border-radius: 0; max-width: 100%; }
+      }
     </style>
   </head>
   <body>
     <div class="receipt">
-      <h1>Cash Receipt</h1>
-      ${row("Receipt Number", receiptNumber)}
-      ${row("Customer", esc(selectedCustomer.name))}
-      ${row("Phone", esc(selectedCustomer.phone || "-"))}
-      ${row("Created Date", paymentDate)}
-      ${row("Payment Method", esc(payment.paymentMethod || "-"))}
-      ${payment.referenceNumber ? row("Reference Number", esc(payment.referenceNumber)) : ""}
-      <div class="amount">Amount Paid: ₹${formatAmount(payment.amount)}</div>
-      ${payment.comments ? row("Comments", esc(payment.comments)) : ""}
-      <div class="footer">Thank you.</div>
+      <div class="header">
+        <div>
+          <div class="brand">PetroSoft</div>
+          <div class="brand-sub">Payment Receipt</div>
+        </div>
+        <div class="header-right">
+          <div class="doc-title">Cash Receipt</div>
+          <div class="doc-number">#${receiptNumber}</div>
+        </div>
+      </div>
+
+      <div class="body">
+        <div class="status-row">
+          <span class="badge">PAID</span>
+          <span class="date">${paymentDate}</span>
+        </div>
+
+        <div class="amount-card">
+          <div class="amount-label">Amount Paid</div>
+          <div class="amount-value">₹${formatAmount(payment.amount)}</div>
+        </div>
+
+        <div class="grid">
+          ${item("Received From", customerName)}
+          ${item("Phone", customerPhone)}
+          ${item("Payment Method", method)}
+          ${item("Receipt Date", paymentDate)}
+          ${
+            payment.referenceNumber
+              ? `<div class="item full">
+                  <div class="item-label">Reference Number</div>
+                  <div class="item-value">${esc(payment.referenceNumber)}</div>
+                </div>`
+              : ""
+          }
+        </div>
+
+        ${
+          payment.comments
+            ? `<div class="comments">
+                <div class="item-label">Comments</div>
+                <div class="item-value">${esc(payment.comments)}</div>
+              </div>`
+            : ""
+        }
+
+        <div class="sign-row">
+          <div class="sign">Customer Signature</div>
+          <div class="sign">Authorized Signature</div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <strong>Thank you for your payment.</strong><br />
+        This is a computer-generated receipt.
+      </div>
     </div>
   </body>
 </html>`);
