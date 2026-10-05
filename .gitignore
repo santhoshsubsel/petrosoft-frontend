@@ -34,6 +34,11 @@ Thumbs.db
 # Coverage
 coverage/
 
+# Playwright artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+
 # Cache
 .cache/
 .parcel-cache/
