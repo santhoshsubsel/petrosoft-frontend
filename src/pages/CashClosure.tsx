@@ -83,9 +83,10 @@ interface Preview {
   supplierBankAmount?: Num;
   otherPayments?: Num;
   totalSales?: Num;
+  totalRevenue?: Num;
   expenses?: Num;
   cashReceipts?: Num;
-  /** Server-calculated: Petroleum + Oil - Credit - Expenses */
+  /** Server-calculated cash sales after expenses */
   cashSales?: Num;
   expectedCash?: Num;
   actualCashEntered?: Num;
@@ -900,15 +901,16 @@ export default function CashClosure() {
   const serverExpected = isClosed ? activeClosure?.expectedCash : preview?.expectedCash;
   const isEstimated = serverExpected === null || serverExpected === undefined;
 
-  /*
-   * Total Cash Sale = Petroleum + Oil - Credit - Expenses
-   * (same formula as the server and the printed Day Cash Closing Report).
-   * Prefer the server-calculated value; fall back to a local calculation.
-   */
+  /* Credit sales are separate from meter-line sales, so do not subtract them here. */
   const baseCashSales =
     preview?.cashSales != null
       ? n(preview.cashSales)
-      : n(preview?.totalSales) + oilTotal - creditTotal - n(preview?.expenses);
+      : petroleumTotal + oilTotal - n(preview?.expenses);
+
+  const totalRevenue =
+    preview?.totalRevenue != null
+      ? n(preview.totalRevenue)
+      : round2(petroleumTotal + oilTotal + creditTotal);
 
   const estimatedExpected =
     n(starting) +
@@ -921,7 +923,6 @@ export default function CashClosure() {
 
   const expected = round2(isEstimated ? estimatedExpected : Number(serverExpected));
   const difference: number | null = actual === "" ? null : round2(Number(actual) - expected);
-  const expectedTotal = petroleumTotal + oilTotal;
 
   const diffTone =
     difference === null
@@ -1210,6 +1211,8 @@ export default function CashClosure() {
     ["Petroleum Total", money(petroleumTotal)],
     ["Oil Total", money(oilTotal)],
     ["Credit Sales", money(creditTotal)],
+    ["Total Revenue", money(totalRevenue)],
+    ["Cash Sales", money(baseCashSales)],
     ["Credit Received", money(creditReceived)],
     ["Credit Balance (Outstanding)", money(creditBalance)],
     ["Cash Receipts (cash mode only)", moneyOrDash(preview?.cashReceipts)],
@@ -1360,8 +1363,8 @@ export default function CashClosure() {
                 <Field label="Expected Expenses">
                   <ReadOnly value={moneyOrDash(preview?.expenses)} />
                 </Field>
-                <Field label="Expected Total" hint="Petroleum total + oil total">
-                  <ReadOnly value={money(expectedTotal)} strong />
+                <Field label="Total Revenue" hint="Petroleum sales + oil sales + credit sales">
+                  <ReadOnly value={money(totalRevenue)} strong />
                 </Field>
               </div>
             </div>

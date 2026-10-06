@@ -78,8 +78,7 @@ export default function Login() {
 
       console.log("LOGIN RESPONSE:", response);
 
-      const payload = response.data ?? response;
-
+      const payload = response?.data ?? response;
       const token = payload.token ?? payload.accessToken;
       const user = payload.user;
 
@@ -95,20 +94,10 @@ export default function Login() {
         throw new Error("LOGIN_ROLE_MISSING");
       }
 
-      localStorage.setItem("petrosoft_token", token);
-
-      localStorage.setItem(
-        "petrosoft_user",
-        JSON.stringify(user)
-      );
-
       if (rememberMe) {
-        localStorage.setItem(
-          "petrosoft_remember",
-          "true"
-        );
+        document.cookie = "petrosoft_remember=true; path=/; SameSite=Lax";
       } else {
-        localStorage.removeItem("petrosoft_remember");
+        document.cookie = "petrosoft_remember=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax";
       }
 
       setSession(token, user);
@@ -412,7 +401,7 @@ export default function Login() {
 
         {/* FOOTER */}
         <p className="mt-12 text-center text-[10px] text-slate-400">
-          RAJ AGENCIES, HPCL DEALER · PetroSoft v1.0.0
+         PetroSoft v1.0.0
         </p>
 
       </div>

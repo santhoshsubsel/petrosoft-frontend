@@ -1,5 +1,19 @@
 import axios from "axios";
 
+const getCookie = (name: string): string | null => {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const match = document.cookie.split("; ").find((entry) => entry.startsWith(`${name}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.split("=").slice(1).join("="));
+};
+
+const eraseCookie = (name: string) => {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+};
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "http://localhost:3000/api/v1";
@@ -13,7 +27,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("petrosoft_token");
+    const token = getCookie("petrosoft_token");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -41,8 +55,8 @@ api.interceptors.response.use(
         url.includes("/close");
 
       if (!onLoginPage && !isCashClosureClose) {
-        localStorage.removeItem("petrosoft_token");
-        localStorage.removeItem("petrosoft_user");
+        eraseCookie("petrosoft_token");
+        eraseCookie("petrosoft_user");
         window.location.href = "/login";
       } else if (isCashClosureClose) {
         // Keep user on page; closeDay() catch will handle setError

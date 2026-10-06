@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { apiGet } from "../services/api";
+import { sessionStorage } from "../utils/session";
 import type { Role, User } from "../types";
 
 interface AuthContextValue {
@@ -22,7 +23,7 @@ const TOKEN_KEY = "petrosoft_token";
 
 const readUser = (): User | null => {
   try {
-    const raw = localStorage.getItem(USER_KEY);
+    const raw = sessionStorage.get(USER_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -30,12 +31,12 @@ const readUser = (): User | null => {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => sessionStorage.get(TOKEN_KEY));
   const [user, setUser] = useState<User | null>(() => readUser());
-  const [loading, setLoading] = useState(Boolean(localStorage.getItem(TOKEN_KEY)));
+  const [loading, setLoading] = useState(Boolean(sessionStorage.get(TOKEN_KEY)));
 
   useEffect(() => {
-    const currentToken = localStorage.getItem(TOKEN_KEY);
+    const currentToken = sessionStorage.get(TOKEN_KEY);
     if (!currentToken) {
       setLoading(false);
       return;
@@ -43,7 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     apiGet<{ success: boolean; data: { userId: string; accountId: string; roleId: string; role: Role; email: string } }>("/auth/me")
       .then((response) => {
-        const me = response.data;
+        const me = response?.data ?? response;
+
+        if (!me || !me.role) {
+          throw new Error("AUTH_ME_INVALID");
+        }
+
         setUser((previous) => ({
           id: me.userId,
           name: previous?.name || me.email.split("@")[0],
@@ -53,8 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }));
       })
       .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        sessionStorage.remove(TOKEN_KEY);
+        sessionStorage.remove(USER_KEY);
         setToken(null);
         setUser(null);
       })
@@ -62,16 +68,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSession = (newToken: string, newUser: User) => {
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    sessionStorage.set(TOKEN_KEY, newToken);
+    sessionStorage.set(USER_KEY, JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
   };
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem("petrosoft_remember");
+    sessionStorage.remove(TOKEN_KEY);
+    sessionStorage.remove(USER_KEY);
+    sessionStorage.remove("petrosoft_remember");
     setToken(null);
     setUser(null);
   };
