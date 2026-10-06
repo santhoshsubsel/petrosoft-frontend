@@ -93,7 +93,7 @@ export default function Topbar() {
         shadow-sm
         backdrop-blur
         sm:px-6
-        lg:left-64
+        lg:left-[250px]
       "
     >
       {/* =================================================
@@ -135,7 +135,7 @@ export default function Topbar() {
             focus-within:bg-white
             focus-within:ring-2
             focus-within:ring-blue-500/10
-            md:flex
+            lg:flex
           "
         >
           <Search

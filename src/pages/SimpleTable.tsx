@@ -168,6 +168,8 @@ export default function SimpleTable({
 
   const [search, setSearch] =
     useState("");
+  const [stockFilter, setStockFilter] =
+    useState("ALL");
 
   const [page, setPage] = useState(1);
 
@@ -308,24 +310,21 @@ export default function SimpleTable({
     const query =
       search.trim().toLowerCase();
 
-    if (!query) {
-      return oilProducts;
-    }
-
     return oilProducts.filter(
-      (product) =>
-        String(
-          product.name ?? ""
-        )
+      (product) => {
+        const matchesSearch = `${product.name ?? ""} ${product.code ?? ""}`
           .toLowerCase()
-          .includes(query) ||
-        String(
-          product.code ?? ""
-        )
-          .toLowerCase()
-          .includes(query)
+          .includes(query);
+        const stock = numberValue(product.currentStock);
+        const minimum = numberValue(product.minStock);
+        const isLow = minimum > 0 && stock <= minimum;
+        const matchesStock = stockFilter === "ALL" ||
+          (stockFilter === "LOW" && isLow) ||
+          (stockFilter === "OK" && !isLow);
+        return matchesSearch && matchesStock;
+      }
     );
-  }, [oilProducts, search]);
+  }, [oilProducts, search, stockFilter]);
 
   // --------------------------------------------------
   // Pagination
@@ -361,7 +360,7 @@ export default function SimpleTable({
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, stockFilter]);
 
   // --------------------------------------------------
   // Selected Product Timeline
@@ -513,6 +512,25 @@ export default function SimpleTable({
       onAction={() =>
         openStockModal()
       }
+      searchValue={search}
+      onSearchChange={setSearch}
+      filterContent={(
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            Stock level
+            <select className="rounded-lg border border-slate-200 bg-white px-3 py-2" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
+              <option value="ALL">All products</option>
+              <option value="LOW">Below minimum</option>
+              <option value="OK">At or above minimum</option>
+            </select>
+          </label>
+          <button type="button" className="text-sm font-semibold text-brand-600" onClick={() => { setStockFilter("ALL"); setSearch(""); }}>Clear filters</button>
+        </div>
+      )}
+      exportData={{
+        headers: ["Name", "Code", "Price", "Unit", "Current Stock", "Minimum Stock"],
+        rows: filteredProducts.map((product) => [product.name ?? "-", product.code ?? "-", product.currentPrice ?? "-", product.unit ?? "-", numberValue(product.currentStock), numberValue(product.minStock)]),
+      }}
     >
       <div className="space-y-4">
 

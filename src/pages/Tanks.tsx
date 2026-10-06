@@ -27,7 +27,13 @@ const HISTORY_PER_PAGE = 10;
 /* Tank Liquid                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function TankLiquid({ percent }: { percent: number }) {
+function TankLiquid({
+  percent,
+  tone,
+}: {
+  percent: number;
+  tone: "critical" | "warning" | "normal";
+}) {
   const [level, setLevel] = useState(0);
 
   useEffect(() => {
@@ -39,9 +45,29 @@ function TankLiquid({ percent }: { percent: number }) {
   }, [percent]);
 
   const visibleLevel = level > 0 ? Math.max(level, 6) : 0;
+  const colors = {
+    critical: {
+      backWave: "text-red-300",
+      frontWave: "text-red-400",
+      fill: "from-red-400 to-red-500",
+    },
+    warning: {
+      backWave: "text-amber-300",
+      frontWave: "text-amber-400",
+      fill: "from-amber-400 to-amber-500",
+    },
+    normal: {
+      backWave: "text-emerald-300",
+      frontWave: "text-emerald-400",
+      fill: "from-emerald-400 to-emerald-500",
+    },
+  }[tone];
 
   return (
-    <div className="relative h-20 w-12 shrink-0 overflow-hidden rounded-lg border-2 border-slate-200 bg-white">
+    <div
+      className="relative h-20 w-12 shrink-0 overflow-hidden rounded-lg border-2 border-slate-200 bg-white"
+      title={tone === "critical" ? "Critical: below 100 units" : tone === "warning" ? "Below minimum capacity" : "Stock level normal"}
+    >
       <div
         className="tank-liquid absolute bottom-0 left-0 right-0"
         style={{
@@ -50,7 +76,7 @@ function TankLiquid({ percent }: { percent: number }) {
         }}
       >
         <svg
-          className="tank-wave-b absolute -top-2 left-0 h-3 w-[200%] text-emerald-300"
+          className={`tank-wave-b absolute -top-2 left-0 h-3 w-[200%] ${colors.backWave}`}
           viewBox="0 0 120 12"
           preserveAspectRatio="none"
         >
@@ -61,7 +87,7 @@ function TankLiquid({ percent }: { percent: number }) {
         </svg>
 
         <svg
-          className="tank-wave-a absolute -top-1.5 left-0 h-3 w-[200%] text-emerald-400"
+          className={`tank-wave-a absolute -top-1.5 left-0 h-3 w-[200%] ${colors.frontWave}`}
           viewBox="0 0 120 12"
           preserveAspectRatio="none"
         >
@@ -71,7 +97,7 @@ function TankLiquid({ percent }: { percent: number }) {
           />
         </svg>
 
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-400 to-emerald-500" />
+        <div className={`absolute inset-0 bg-gradient-to-b ${colors.fill}`} />
 
         <span
           className="tank-bubble absolute bottom-1 left-[28%] h-1.5 w-1.5 rounded-full bg-white/70"
@@ -135,6 +161,8 @@ export default function Tanks() {
   const [tanks, setTanks] = useState<Tank[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [tankFilter, setTankFilter] = useState("ALL");
 
   /* Add Stock */
   const [showAddStock, setShowAddStock] = useState(false);
@@ -356,6 +384,22 @@ export default function Tanks() {
     [history, historyStartIndex]
   );
 
+  const filteredTanks = tanks.filter((tank) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = `${tank.name} ${tank.product?.name ?? ""} ${tank.product?.code ?? ""}`
+      .toLowerCase()
+      .includes(query);
+    const stock = Number(tank.availableStock);
+    const capacity = Number(tank.capacity);
+    const isLow = Number(tank.minCapacity) > 0 && stock <= Number(tank.minCapacity);
+    const matchesFilter = tankFilter === "ALL" ||
+      (tankFilter === "ACTIVE" && tank.active) ||
+      (tankFilter === "INACTIVE" && !tank.active) ||
+      (tankFilter === "LOW_STOCK" && isLow) ||
+      (tankFilter === "FULL" && capacity > 0 && stock >= capacity);
+    return matchesSearch && matchesFilter;
+  });
+
   /* ------------------------------------------------------------------------ */
   /* Render                                                                   */
   /* ------------------------------------------------------------------------ */
@@ -433,6 +477,27 @@ export default function Tanks() {
         subtitle="Monitor tank capacity, minimum level and available stock."
         action="Add Stock"
         onAction={openAddStock}
+        searchValue={search}
+        onSearchChange={setSearch}
+        filterContent={(
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              Show
+              <select className="rounded-lg border border-slate-200 bg-white px-3 py-2" value={tankFilter} onChange={(event) => setTankFilter(event.target.value)}>
+                <option value="ALL">All tanks</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="LOW_STOCK">Below minimum</option>
+                <option value="FULL">At capacity</option>
+              </select>
+            </label>
+            <button type="button" className="text-sm font-semibold text-brand-600" onClick={() => { setTankFilter("ALL"); setSearch(""); }}>Clear filters</button>
+          </div>
+        )}
+        exportData={{
+          headers: ["Tank", "Product", "Available Stock", "Minimum Stock", "Capacity", "Status"],
+          rows: filteredTanks.map((tank) => [tank.name, tank.product?.name ?? "-", tank.availableStock, tank.minCapacity, tank.capacity, tank.active ? "Active" : "Inactive"]),
+        }}
       >
         {loading ? (
           <div className="card grid min-h-40 place-items-center">
@@ -451,7 +516,11 @@ export default function Tanks() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {tanks.map((tank) => {
+            {filteredTanks.length === 0 ? (
+              <div className="card col-span-full p-8 text-center text-sm text-slate-500">
+                No tanks match these filters.
+              </div>
+            ) : filteredTanks.map((tank) => {
               const capacity = Number(tank.capacity);
 
               const available = Number(
@@ -468,6 +537,11 @@ export default function Tanks() {
                       )
                     )
                   : 0;
+              const tone = available < 100
+                ? "critical"
+                : available < Number(tank.minCapacity)
+                  ? "warning"
+                  : "normal";
 
               return (
                 <div
@@ -535,7 +609,7 @@ export default function Tanks() {
 
                     {/* Tank Level */}
                     <div className="ml-2">
-                      <TankLiquid percent={percent} />
+                      <TankLiquid percent={percent} tone={tone} />
                     </div>
                   </div>
 

@@ -8,7 +8,7 @@ export default function AppLayout() {
       <Sidebar />
       <div className="min-w-0 lg:pl-[250px]">
         <Topbar />
-        <main className="min-w-0 p-3 sm:p-5 lg:p-6 xl:p-7">
+        <main className="min-w-0 p-3 pt-10 sm:p-5 sm:pt-12 lg:p-6 lg:pt-12 xl:p-7 xl:pt-12">
           <Outlet />
         </main>
       </div>

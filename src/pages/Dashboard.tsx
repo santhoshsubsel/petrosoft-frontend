@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Download,
   IndianRupee,
   Receipt,
   ShoppingCart,
@@ -135,6 +134,7 @@ export default function Dashboard() {
   ------------------------------------------------------- */
 
   const [report, setReport] = useState<SalesReport | null>(null);
+  const [monthlyReport, setMonthlyReport] = useState<SalesReport | null>(null);
   const [salesLoading, setSalesLoading] = useState(true);
 const [searchParams] = useSearchParams();
 
@@ -150,6 +150,7 @@ const getLocalDate = () => {
 
 const selectedDate =
   searchParams.get("date") || getLocalDate();
+const chartYear = Number(selectedDate.slice(0, 4)) || new Date().getFullYear();
   /* -------------------------------------------------------
      PRODUCTS
   ------------------------------------------------------- */
@@ -203,6 +204,22 @@ useEffect(() => {
 
   void loadSales();
 }, [selectedDate]);
+
+useEffect(() => {
+  const loadMonthlySales = async () => {
+    try {
+      const monthlyData = await getResource<SalesReport>(
+        `/reports/sales?from=${chartYear}-01-01&to=${chartYear}-12-31`
+      );
+      setMonthlyReport(monthlyData);
+    } catch (error) {
+      console.error("Monthly sales chart loading failed:", error);
+      setMonthlyReport({ dailySales: [] });
+    }
+  };
+
+  void loadMonthlySales();
+}, [chartYear]);
   /* =======================================================
      LOAD PRODUCTS
   ======================================================= */
@@ -270,15 +287,24 @@ useEffect(() => {
   ======================================================= */
 
   const trend = useMemo(() => {
-    return (report?.dailySales ?? []).map((item) => ({
-      time: new Date(item.businessDate).toLocaleDateString("en-IN", {
-        day: "2-digit",
+    const monthlyTotals = Array.from({ length: 12 }, () => 0);
+
+    (monthlyReport?.dailySales ?? []).forEach((item) => {
+      const businessDate = new Date(`${item.businessDate.slice(0, 10)}T00:00:00`);
+      if (Number.isNaN(businessDate.getTime()) || businessDate.getFullYear() !== chartYear) {
+        return;
+      }
+
+      monthlyTotals[businessDate.getMonth()] += Number(item.totalAmount) || 0;
+    });
+
+    return monthlyTotals.map((sales, monthIndex) => ({
+      month: new Date(chartYear, monthIndex, 1).toLocaleDateString("en-IN", {
         month: "short",
       }),
-
-      sales: Number(item.totalAmount),
+      sales,
     }));
-  }, [report]);
+  }, [monthlyReport, chartYear]);
 
   /* =======================================================
      REVENUE DISTRIBUTION
@@ -694,20 +720,13 @@ useEffect(() => {
         <section className="card flex flex-col overflow-hidden p-5">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-bold text-slate-900">Sales Performance</h2>
+              <h2 className="font-bold text-slate-900">Monthly Sales Performance</h2>
 
               <p className="text-xs text-slate-400">
-                Daily sales performance from backend
+                Monthly sales for {chartYear}
               </p>
             </div>
 
-            <button
-              type="button"
-              className="btn-secondary inline-flex items-center gap-1.5 py-2 text-xs"
-            >
-              <Download size={14} />
-              Export
-            </button>
           </div>
 
           <div className="h-72 w-full">
@@ -751,11 +770,12 @@ useEffect(() => {
                   />
 
                   <XAxis
-                    dataKey="time"
+                    dataKey="month"
                     tickLine={false}
                     axisLine={false}
                     fontSize={11}
                     tickMargin={10}
+                    interval={0}
                     padding={{ left: 24, right: 24 }}
                     tick={{ fill: "#94a3b8" }}
                   />

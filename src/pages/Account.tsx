@@ -669,12 +669,11 @@ function PetrolTab() {
       productId: data.productId,
       capacity: data.capacity,
       minCapacity: data.minimum,
-      availableStock: data.available,
       active: data.active,
     };
     const saved = editingTank
-      ? await updateTank(editingTank.id, payload as any)
-      : await createTank(payload as any);
+      ? await updateTank(editingTank.id, payload)
+      : await createTank({ ...payload, availableStock: 0 });
     const normalized = normalizeTank(saved, fuelProducts);
     setTanks((prev) => (editingTank ? prev.map((item) => (item.id === editingTank.id ? normalized : item)) : [normalized, ...prev]));
     setTankModal(false);
@@ -1243,7 +1242,6 @@ function TankModal({
   const [productId, setProductId] = useState(tank?.productId ?? products[0]?.id ?? "");
   const [capacity, setCapacity] = useState(tank ? String(tank.capacity) : "");
   const [minimum, setMinimum] = useState(tank ? String(tank.minimum) : "");
-  const [available, setAvailable] = useState(tank ? String(tank.available) : "");
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
@@ -1251,7 +1249,7 @@ function TankModal({
     const selectedProduct = products.find((item) => item.id === productId);
     try {
       setSaving(true);
-      await onSave({ id: tank?.id ?? "", name: name.trim(), productId, product: selectedProduct?.name ?? "", capacity: Number(capacity), minimum: Number(minimum || 0), available: Number(available || 0), active: tank?.active ?? true });
+      await onSave({ id: tank?.id ?? "", name: name.trim(), productId, product: selectedProduct?.name ?? "", capacity: Number(capacity), minimum: Number(minimum || 0), available: tank?.available ?? 0, active: tank?.active ?? true });
     } finally {
       setSaving(false);
     }
@@ -1264,7 +1262,17 @@ function TankModal({
         <SelectField label="Product" value={productId} options={products.map((item) => ({ label: item.name, value: item.id }))} onChange={setProductId} />
         <Field label="Capacity" required type="number" value={capacity} onChange={setCapacity} />
         <Field label="Minimum Level" type="number" value={minimum} onChange={setMinimum} />
-        <Field label="Available Stock" type="number" value={available} onChange={setAvailable} />
+        {tank ? (
+          <div className="sm:col-span-2 rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-medium text-slate-500">Available Stock</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">{tank.available.toLocaleString("en-IN")}</p>
+            <p className="mt-1 text-xs text-slate-500">To change stock, use Add Stock in Tank Management.</p>
+          </div>
+        ) : (
+          <p className="sm:col-span-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+            New tanks start with zero stock. Add stock from Tank Management using Add Stock.
+          </p>
+        )}
       </div>
       <ModalFooter saving={saving} onCancel={onClose} onSave={submit} />
     </Modal>
